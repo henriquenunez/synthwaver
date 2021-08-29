@@ -10,105 +10,14 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "util.h"
+#include "surface.h"
 #include "shader.h"
+#include "perlin_noise.h"
 
 #include <iostream>
 
 #define SQ(a) (a * a)
-
-struct point
-{
-  float x, y, z;
-
-  static float distance(const point& a, const point& b)
-  {
-    return (float)sqrt(pow(a.x - b.x, 2.0) + pow(a.y - b.y, 2.0) + pow(a.z - b.z, 2.0));
-  }
-};
-
-struct triangle
-{
-  point p1, p2, p3;
-};
-
-inline float rand_color()
-{
-  return (float) rand() / (float) RAND_MAX;
-}
-
-bool float_eq(float a, float b)
-{
-  if (fabs(a - b) < 0.001) return true;
-  return false;
-}
-
-// Ok I'll implement a 3D triangulation
-triangle gen_triangle(const point& pivot, const std::vector<point>& point_set)
-{
-  triangle tri;
-  
-  // Search for the 2 closest points
-  float dist = INFINITY;
-  point closest_point, sec_closest_point;
-
-  // First one
-  for (const point& a : point_set)
-  {
-    //printf("a: %f %f %f\n", a.x, a.y, a.z);
-
-    // Check if we're not on the pivot
-    if (float_eq(a.x, pivot.x) &&
-        float_eq(a.y, pivot.y) &&
-        float_eq(a.z, pivot.z)) continue;
-
-    const float d = point::distance(a, pivot);
-
-    if (d < dist)
-    {
-      dist = d;
-      closest_point = a;
-    }
-  }
-
-  dist = INFINITY;
-
-  // Second one
-  for (const point& a : point_set)
-  {
-    // Check if we're not on the pivot or the closest point
-    if ((float_eq(a.x, pivot.x) &&
-        float_eq(a.y, pivot.y) &&
-        float_eq(a.z, pivot.z)) ||
-        (float_eq(a.x, closest_point.x) &&
-        float_eq(a.y, closest_point.y) &&
-        float_eq(a.z, closest_point.z))) continue;
-
-    const float d = point::distance(a, pivot);
-    //printf("Dist: %f\n", d);
-
-    if (d < dist)
-    {
-      dist = d;
-      sec_closest_point = a;
-    }
-  }
-
-  tri.p1 = pivot;
-  tri.p2 = closest_point;
-  tri.p3 = sec_closest_point;
-
-  printf("Generated triangle: %f %f %f - %f %f %f - %f %f %f\n", pivot.x,
-          pivot.y,
-          pivot.z,
-          closest_point.x,
-          closest_point.y,
-          closest_point.z,
-          sec_closest_point.x,
-          sec_closest_point.y,
-          sec_closest_point.z);
-
-  return tri;
-}
 
 int SCREEN_WIDTH = 800;
 int SCREEN_HEIGHT = 800;
@@ -151,6 +60,13 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
       part_yaw   -= xoffset * 0.2;
       part_pitch += yoffset * 0.2;
     }
+}
+
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    //viewport_changed = true;
+    SCREEN_HEIGHT = height; SCREEN_WIDTH = width;
+    glViewport(0, 0, width, height);
 }
 
 void processInput(GLFWwindow *window)
@@ -199,7 +115,7 @@ GLFWwindow* init_open_gl()
       return NULL;
   }
 
-  //glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+  glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
   glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -221,23 +137,27 @@ GLFWwindow* init_open_gl()
 void generate_surface(std::vector<triangle> &surface)
 {
   // Generate terrain
-  int rows = 10;
-  int cols = 10;
+  int rows = 30;
+  int cols = 30;
 
   std::vector<point> point_vec;
   for (int i = 0; i < rows ; i++)
     for (int j = 0; j < cols ; j++)
     {
-      point a = {(float)i * 0.1f, (float)j * 0.1f, rand_color()};
+      float x = (float)i * 0.05f;
+      float y = (float)j * 0.05f;
+      point a = {x, y, perlin(x, y)};
+      //point a = {x, y, rand_color()};
       printf("Putting: %f %f %f\n", a.x, a.y, a.z);
       point_vec.push_back(a);
     }
 
   // ill begin with an ugly algorithm that makes a triangle out of the 3 closest.
-  for (const point& a : point_vec)
-  {
-    surface.push_back(gen_triangle(a, point_vec));
-  }
+  //for (const point& a : point_vec)
+  //{
+  //  surface.push_back(gen_triangle(a, point_vec));
+  //}
+  delaunay_triangulation(point_vec, surface);
 }
 
 struct render_object_t
@@ -400,7 +320,7 @@ struct reference_arrows_t
 
     // Apply transformations
     glm::mat4 model(1.0f);
-    model = glm::translate(model, glm::vec3(dx, dy, dz));
+    model = glm::translate(model, glm::vec3(0.0, 0.0, 0.0));
     //model = glm::translate(model, glm::vec3(0.0, 0.0, -5.0));
     model = glm::rotate(model, part_yaw, glm::vec3(0.0f, 1.0f, 0.0f));
     model = glm::rotate(model, part_pitch, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -426,8 +346,27 @@ struct reference_arrows_t
   }
 };
 
+void tests()
+{
+  // Test if points are equal.
+  point p1 = {0.0, 0.0, 0.0};
+  point p2 = {0.0, 0.0, 0.0};
+
+  printf("Should be true: %d\n", p1.eq_xy(p2));
+
+  // Test if edges are equal.
+  edge e1 = {{0.0, 1.0, 0.0}, {0.0, 0.0, 0.0}};
+  edge e2 = {{0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}};
+  edge e3 = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+
+  printf("Should be true: %d\n", e1 == e2);
+  printf("Should be false: %d\n", e3 == e2);
+}
+
 int main()
 {
+  tests();
+
   GLFWwindow *window = init_open_gl();
 
   std::vector<triangle> surface;
