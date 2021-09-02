@@ -15,12 +15,17 @@
 #include "shader.h"
 #include "perlin_noise.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #include <iostream>
 
 #define SQ(a) (a * a)
 
 int SCREEN_WIDTH = 800;
 int SCREEN_HEIGHT = 800;
+
+void save_to_file();
 
 float dx,
 dy, dz; // Position of the camera
@@ -74,20 +79,22 @@ void processInput(GLFWwindow *window)
   if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
 
   else if(glfwGetKey(window, GLFW_KEY_F1) == GLFW_PRESS) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-  
+
   else if(glfwGetKey(window, GLFW_KEY_F2) == GLFW_PRESS) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-  
+
   else if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) dy += MOV_SPEED;
-  
+
   else if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) dx -= MOV_SPEED;
-  
+
   else if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) dy -= MOV_SPEED;
-  
+
   else if(glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) dx += MOV_SPEED;
 
   else if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) dz -= MOV_SPEED;
 
   else if(glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) dz += MOV_SPEED;
+
+  else if(glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) save_to_file();
 }
 
 GLFWwindow* init_open_gl()
@@ -158,6 +165,21 @@ void generate_surface(std::vector<triangle> &surface)
   //  surface.push_back(gen_triangle(a, point_vec));
   //}
   delaunay_triangulation(point_vec, surface);
+}
+
+void save_to_file()
+{
+    // The format is RGB
+    void* data = malloc(3 * SCREEN_HEIGHT * SCREEN_WIDTH);
+    // Read pixels
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadBuffer(GL_BACK_LEFT);
+    glReadPixels(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, data);
+    // Save to file
+    if (!stbi_write_png("bg.png", SCREEN_WIDTH, SCREEN_HEIGHT, 3, data, 3 * SCREEN_WIDTH))
+	printf("Could not save the file!\n");
+    else printf("File saved!\n");
+    free(data);
 }
 
 struct render_object_t
