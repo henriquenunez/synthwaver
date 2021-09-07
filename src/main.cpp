@@ -13,7 +13,7 @@
 #include "util.h"
 #include "surface.h"
 #include "shader.h"
-#include "perlin_noise.h"
+#include "terrain.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -141,9 +141,9 @@ GLFWwindow* init_open_gl()
   return window;
 }
 
+// Generate terrain
 void generate_surface(std::vector<triangle> &surface)
 {
-  // Generate terrain
   int rows = 30;
   int cols = 30;
 
@@ -153,7 +153,7 @@ void generate_surface(std::vector<triangle> &surface)
     {
       float x = (float)i * 0.05f;
       float y = (float)j * 0.05f;
-      point a = {x, y, perlin(x, y)};
+      point a = {x, y, perlin(x * 3, y * 3)};
       //point a = {x, y, rand_color()};
       printf("Putting: %f %f %f\n", a.x, a.y, a.z);
       point_vec.push_back(a);
@@ -387,6 +387,7 @@ void tests()
 
 int main()
 {
+    srand(time(0));
   tests();
 
   GLFWwindow *window = init_open_gl();

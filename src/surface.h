@@ -147,7 +147,7 @@ void delaunay_triangulation(const std::vector<point> &points, std::vector<triang
     // I know it's slow, ok?
     for (int i = 0 ; i < bad_triangles.size() ; i++)  // for triangle in bad triangles
     {
-      bool e1 = true;
+      bool e1 = true; // If the edge is part of the big polygon
       bool e2 = true;
       bool e3 = true;
 
@@ -155,10 +155,10 @@ void delaunay_triangulation(const std::vector<point> &points, std::vector<triang
       
       for (int j = 0 ; j < bad_triangles.size() ; j++) // edge in this triangle 
       {
-        const triangle &t2 = triangulation[bad_triangles[j]];
-
         // Skip if it's the same triangle
         if (i == j) continue;
+        
+        const triangle &t2 = triangulation[bad_triangles[j]];
 
         edge a;
 
@@ -217,15 +217,26 @@ void delaunay_triangulation(const std::vector<point> &points, std::vector<triang
       printf("%f %f %f - %f %f %f - %f %f %f\n", a.p1.x, a.p1.y, a.p1.z, a.p2.x, a.p2.y, a.p2.z, a.p3.x, a.p3.y, a.p3.z);
    }
 
+    // TODO: use only good containers. Stop using c++ plz.
+    triangle* temp_triangulation = (triangle*)malloc(sizeof(triangle) * triangulation.size());
+    size_t temp_tri_sz = 0;
+
    // Remove all triangles that share a vertex with the original supertriangle
    for (std::vector<triangle>::iterator it = triangulation.begin();
         it != triangulation.end(); ++it)
     {
-      if (it->has_common_vertex_xy(s_a, s_b, s_c))
+      if (!it->has_common_vertex_xy(s_a, s_b, s_c)) // Should keep the triangle
       {
-        triangulation.erase(it);
+        temp_triangulation[temp_tri_sz++] = *it;
       }
     }
+
+   triangulation.clear();
+   // Copy back from temp_triangulation into the triangulation
+   for (int i = 0 ; i < temp_tri_sz ; i++)
+   {
+    triangulation.push_back(temp_triangulation[i]);
+   }
 }
 
 triangle gen_triangle(const point& pivot, const std::vector<point>& point_set)
