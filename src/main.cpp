@@ -22,8 +22,8 @@
 
 #define SQ(a) (a * a)
 
-int SCREEN_WIDTH = 800;
-int SCREEN_HEIGHT = 800;
+int SCREEN_WIDTH = 600;
+int SCREEN_HEIGHT = 600;
 
 void save_to_file();
 
@@ -144,8 +144,8 @@ GLFWwindow* init_open_gl()
 // Generate terrain
 void generate_surface(std::vector<triangle> &surface)
 {
-  int rows = 30;
-  int cols = 30;
+  int rows = 50;
+  int cols = 50;
 
   std::vector<point> point_vec;
   for (int i = 0; i < rows ; i++)
@@ -153,8 +153,19 @@ void generate_surface(std::vector<triangle> &surface)
     {
       float x = (float)i * 0.05f;
       float y = (float)j * 0.05f;
-      point a = {x, y, perlin(x * 3, y * 3)};
+      
+      point a;
+      if (i > 10 && i <= 30 && j > 10 && j <= 30)
+      {
+        a = {x, y, perlin(x * 3, y * 3)};
+      }
+      else
+      {
+        a = {x, y, 0};
+      }
+
       //point a = {x, y, rand_color()};
+      
       printf("Putting: %f %f %f\n", a.x, a.y, a.z);
       point_vec.push_back(a);
     }
@@ -188,23 +199,28 @@ struct render_object_t
   shader_t *shader_program;
   unsigned int shader_program_id;
   unsigned int triangle_n = 0;
+  unsigned int time = 0;
 
   render_object_t(std::vector<triangle> surface)
   {
     // Gen buffers
     std::vector<float> vtx_buffer;
-    for (const triangle& a : surface)
+    for (triangle& a : surface)
     {
-      const float r = rand_color();
-      const float g = rand_color();
-      const float b = rand_color();
+      const float r = 70.0f/255.0f; //rand_color();
+      const float g = 30.0f/255.0f; //rand_color();
+      const float b = 82.0f/255.0f; //rand_color();
+      const point normal = a.get_normal_vector();
 
-      vtx_buffer.push_back(a.p1.x);
+      vtx_buffer.push_back(a.p1.x); // Position
       vtx_buffer.push_back(a.p1.y);
       vtx_buffer.push_back(a.p1.z);
-      vtx_buffer.push_back(r);
+      vtx_buffer.push_back(r); // Color
       vtx_buffer.push_back(g);
       vtx_buffer.push_back(b);
+      vtx_buffer.push_back(normal.x); // Normal
+      vtx_buffer.push_back(normal.y);
+      vtx_buffer.push_back(normal.z);
 
       vtx_buffer.push_back(a.p2.x);
       vtx_buffer.push_back(a.p2.y);
@@ -212,6 +228,9 @@ struct render_object_t
       vtx_buffer.push_back(r);
       vtx_buffer.push_back(g);
       vtx_buffer.push_back(b);
+      vtx_buffer.push_back(normal.x);
+      vtx_buffer.push_back(normal.y);
+      vtx_buffer.push_back(normal.z);
 
       vtx_buffer.push_back(a.p3.x);
       vtx_buffer.push_back(a.p3.y);
@@ -219,9 +238,14 @@ struct render_object_t
       vtx_buffer.push_back(r);
       vtx_buffer.push_back(g);
       vtx_buffer.push_back(b);
+      vtx_buffer.push_back(normal.x);
+      vtx_buffer.push_back(normal.y);
+      vtx_buffer.push_back(normal.z);
 
       triangle_n++;
     }
+
+    light_position = glm::vec3(10.0, 10.0, 10.0);
 
     // Buffers and shader
     shader_err s_err;
@@ -241,15 +265,22 @@ struct render_object_t
             &vtx_buffer[0],
             GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3*sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3*sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(6*sizeof(float)));
+    glEnableVertexAttribArray(2);
   }
+
+  glm::vec3 light_position;
 
   void render()
   {
+    time++;
+
     // draw
     use_shader(shader_program);
     glBindVertexArray(vao);
@@ -261,7 +292,9 @@ struct render_object_t
     model = glm::rotate(model, part_pitch, glm::vec3(1.0f, 0.0f, 0.0f));
 
     glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-    glm::mat4 projection = glm::perspective(glm::radians(20.0f), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(70.0f), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
+
+    light_position = glm::vec3(sin((float)time/100) * 10.0, cos((float)time/100) * 10.0, 10.0);
 
     unsigned int model_loc = glGetUniformLocation(shader_program_id, "model");
     glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
@@ -271,6 +304,9 @@ struct render_object_t
 
     unsigned int projection_loc = glGetUniformLocation(shader_program_id, "projection");
     glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
+
+    unsigned int light_pos_loc = glGetUniformLocation(shader_program_id, "light_pos");
+    glUniform3f(light_pos_loc, light_position.x, light_position.y, light_position.z);
 
     glDrawArrays(GL_TRIANGLES, 0, triangle_n * 3);
   }
@@ -387,7 +423,7 @@ void tests()
 
 int main()
 {
-    srand(time(0));
+  srand(time(0));
   tests();
 
   GLFWwindow *window = init_open_gl();

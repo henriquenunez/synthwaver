@@ -27,6 +27,11 @@ struct point
 
     return false;
   }
+
+  point operator-(const point &b)
+  {
+      return {this->x - b.x, this->y - b.y, this->z - b.z};
+  }
 };
 
 struct triangle
@@ -87,6 +92,17 @@ struct triangle
 
     if (det > 0) return true;
     return false;
+  }
+
+  const point get_normal_vector()
+  {
+    point a = p1 - p2, b = p2 - p3; // Vectors a and b
+
+    float i_m = a.y * b.z - a.z * b.y;
+    float j_m = a.x * b.z - a.z * b.x;
+    float k_m = a.x * b.y - a.y * b.x;
+
+    return {i_m, j_m, k_m};
   }
 };
 
